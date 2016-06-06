@@ -1,0 +1,23 @@
+{
+  "name": "emstech-bodytec-card-reader",
+  "version": "0.0.1",
+  "description": "NFC card reader for Miha Bodytec 2nd generation machines",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "NFC",
+    "Mifare",
+    "Mifare",
+    "4K",
+    "Miha",
+    "Bodytec"
+  ],
+  "author": "Ionut Costica",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.4.0",
+    "pcsclite": "^0.4.9"
+  }
+}
