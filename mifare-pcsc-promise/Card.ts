@@ -66,6 +66,13 @@ export class Card {
 		));
 	}
 
+	// EXPERIMENTAL
+	public readTag(): Promise<Buffer> {
+		return handlePCSCReadOperationReturn(this.reader.transmitAsync(
+			new Buffer([0xFF, 0xB0, 0x00, 0x00, 0x00, 0x00]), 0, this.protocol
+		));
+	}
+
 	public updateBlock(blockNumber: number, newData: Buffer): Promise<void> {
 		if (blockNumber < 0 || blockNumber > 0x3F) throw new Error("Block out of range");
 		if (newData.length !== 0x10 && newData.length !== 0x20 && newData.length !== 0x30) {
