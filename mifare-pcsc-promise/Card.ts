@@ -3,31 +3,37 @@
 import {byteFromTwoHex, DEFAULT_END_ACS, KEY_TYPE_A, KEY_TYPE_B, KeyType} from './common';
 import * as Promise from 'bluebird';
 
+function bufferEndsWith(buffer: Buffer, ending: Buffer): boolean {
+	let bufferLength = buffer.length;
+	let endingLength = ending.length;
+
+	// quit early if ending buffer is larger than the first buffer
+	if (bufferLength < endingLength) return false;
+
+	return (buffer.slice(bufferLength - endingLength).compare(ending) === 0);
+}
+
+const OPERATION_OK_ENDING = new Buffer([0x90, 0x00]);
+const OPERATION_FAILED_ENDING = new Buffer([0x63, 0x00]);
+
 function makeStandardCardPromise(promise: Promise<Buffer>): Promise<void> {
 	return promise
 		.then(data => {
-			switch(data.toString('hex')) {
-				case '9000':
-					return null;
-				case '6300':
-					throw new Error('Failed command');
-				default:
-					throw new Error(`Undefined data: ${data.toString('hex')}`);
-			}
+			if (bufferEndsWith(data, OPERATION_OK_ENDING)) return;
+			if (bufferEndsWith(data, OPERATION_FAILED_ENDING))
+				throw new Error('Failed command');
+			throw new Error(`Undefined data: ${data.toString('hex')}`);
 		});
 }
 
 function makeReaderCardPromise(promise: Promise<Buffer>): Promise<Buffer> {
 	return promise
 		.then(data => {
-			switch(data.slice(data.length - 2).toString('hex')) {
-				case '9000':
-					return data.slice(0, data.length - 2);
-				case '6300':
-					throw new Error('Failed command');
-				default:
-					throw new Error(`Undefined data: ${data.toString('hex')}`);
-			}
+			if (bufferEndsWith(data, OPERATION_OK_ENDING))
+				return data.slice(0, data.length - 2);
+			if (bufferEndsWith(data, OPERATION_FAILED_ENDING))
+				throw new Error('Failed command');
+			throw new Error(`Undefined data: ${data.toString('hex')}`);
 		});
 }
 
