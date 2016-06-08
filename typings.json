@@ -3,5 +3,8 @@
   "version": false,
   "dependencies": {
     "bluebird": "registry:npm/bluebird#3.3.4+20160531224558"
+  },
+  "globalDependencies": {
+    "es6-shim": "registry:dt/es6-shim#0.31.2+20160602141504"
   }
 }
