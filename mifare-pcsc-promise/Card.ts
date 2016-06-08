@@ -50,26 +50,23 @@ export class Card {
 	}
 	
 	public authenticate(blockNumber: number, keyType: KeyType, authKeyNumber: number): Promise<void> {
-		if (keyType !== KeyType.A && keyType !== KeyType.B) throw new Error("Wrong key type");
-		if (blockNumber < 0 || blockNumber > 0x3F) throw new Error("Block out of range");
 		if (authKeyNumber < 0 || authKeyNumber > 0x20) throw new Error("Key Number out of range");
 		return handlePCSCOperationReturn(this.reader.transmitAsync(
 			new Buffer([0xFF, 0x86, 0x00, 0x00, 0x05, 0x01, blockNumber>>8, blockNumber%256, keyType, authKeyNumber]), 2, this.protocol
 		));
 	}
 	
-	public readBlock(blockNumber: number, length: number): Promise<Buffer> {
-		if (blockNumber < 0 || blockNumber > 0x3F) throw new Error("Block out of range");
-		if (length !== 0x10 && length !== 0x20 && length !== 0x30) throw new Error("Bad length");
+	public readBlock(blockNumber: number, _length: number = 0x10): Promise<Buffer> {
+		let length = 0x10; // different length isn't working for some reason
 		return handlePCSCReadOperationReturn(this.reader.transmitAsync(
-			new Buffer([0xFF, 0xB0, 0, blockNumber, length]), length + 2, this.protocol
+			new Buffer([0xFF, 0xB0, blockNumber>>8, blockNumber%256, length]), length + 2, this.protocol
 		));
 	}
 
-	// EXPERIMENTAL
+	// EXPERIMENTAL -- TOTALLY NOT WORKING
 	public readTag(): Promise<Buffer> {
 		return handlePCSCReadOperationReturn(this.reader.transmitAsync(
-			new Buffer([0xFF, 0xB0, 0x00, 0x00, 0x00, 0x00]), 0, this.protocol
+			new Buffer([0xFF, 0xB0, 0x00, 0x00, 0x00, 0x00]), 2, this.protocol
 		));
 	}
 
