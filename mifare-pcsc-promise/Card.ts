@@ -1,41 +1,18 @@
 ///<reference path="../typings/modules/bluebird/index.d.ts"/>
 
-import {byteFromTwoHex, DEFAULT_END_ACS, KEY_TYPE_A, KEY_TYPE_B, KeyType} from './common';
+/****************************************************************************
+ * Information on PC/SC commands:
+ * http://www.pcscworkgroup.com/specifications/files/pcsc3_v2.01.09.pdf
+ * http://www.pcscworkgroup.com/specifications/files/pcsc3_v2.01.09_sup.pdf
+ * http://www.pcscworkgroup.com/specifications/files/pcsc3_v2.01.09_amd1.pdf
+ ****************************************************************************/
+
 import * as Promise from 'bluebird';
-
-function bufferEndsWith(buffer: Buffer, ending: Buffer): boolean {
-	let bufferLength = buffer.length;
-	let endingLength = ending.length;
-
-	// quit early if ending buffer is larger than the first buffer
-	if (bufferLength < endingLength) return false;
-
-	return (buffer.slice(bufferLength - endingLength).compare(ending) === 0);
-}
-
-const OPERATION_OK_ENDING = new Buffer([0x90, 0x00]);
-const OPERATION_FAILED_ENDING = new Buffer([0x63, 0x00]);
-
-function makeStandardCardPromise(promise: Promise<Buffer>): Promise<void> {
-	return promise
-		.then(data => {
-			if (bufferEndsWith(data, OPERATION_OK_ENDING)) return;
-			if (bufferEndsWith(data, OPERATION_FAILED_ENDING))
-				throw new Error('Failed command');
-			throw new Error(`Undefined data: ${data.toString('hex')}`);
-		});
-}
-
-function makeReaderCardPromise(promise: Promise<Buffer>): Promise<Buffer> {
-	return promise
-		.then(data => {
-			if (bufferEndsWith(data, OPERATION_OK_ENDING))
-				return data.slice(0, data.length - 2);
-			if (bufferEndsWith(data, OPERATION_FAILED_ENDING))
-				throw new Error('Failed command');
-			throw new Error(`Undefined data: ${data.toString('hex')}`);
-		});
-}
+import {byteFromTwoHex, DEFAULT_END_ACS, KeyType} from './common';
+import {
+	handlePCSCOperationReturn,
+	handlePCSCReadOperationReturn
+} from './handle-return-buffer';
 
 interface ACS {
 	c1: number;
@@ -56,9 +33,12 @@ export class Card {
 	}
 	
 	public getUID(): Promise<Buffer> {
-		return makeReaderCardPromise(this.reader.transmitAsync(new Buffer([0xFF, 0xCA, 0, 0, 0]), 6, this.protocol));
+		return handlePCSCReadOperationReturn(this.reader.transmitAsync(
+			new Buffer([0xFF, 0xCA, 0x00, 0x00, 0x00]), 6, this.protocol
+		));
 	}
 
+	// if authKeyNumber is 0x20 (32), then the key is loaded in non-volatile memory
 	public loadAuthKey(authKeyNumber: number, key: Buffer): Promise<void> {
 		if (authKeyNumber < 0 || authKeyNumber > 0x20) throw new Error("Key Number is out of range");
 		if (key.length !== 6) throw new Error("Key length should be 6");
@@ -66,22 +46,22 @@ export class Card {
 			new Buffer([0xFF, 0x82, (authKeyNumber === 0x20) ? 0x20 : 0, authKeyNumber, 6]),
 			new Buffer(key),
 		]);
-		return makeStandardCardPromise(this.reader.transmitAsync(buff, 2, this.protocol));
+		return handlePCSCOperationReturn(this.reader.transmitAsync(buff, 2, this.protocol));
 	}
 	
 	public authenticate(blockNumber: number, keyType: KeyType, authKeyNumber: number): Promise<void> {
 		if (keyType !== KeyType.A && keyType !== KeyType.B) throw new Error("Wrong key type");
 		if (blockNumber < 0 || blockNumber > 0x3F) throw new Error("Block out of range");
 		if (authKeyNumber < 0 || authKeyNumber > 0x20) throw new Error("Key Number out of range");
-		return makeStandardCardPromise(this.reader.transmitAsync(
-			new Buffer([0xFF, 0x86, 0, 0, 5, 1, 0, blockNumber, keyType, authKeyNumber]), 2, this.protocol
+		return handlePCSCOperationReturn(this.reader.transmitAsync(
+			new Buffer([0xFF, 0x86, 0x00, 0x00, 0x05, 0x01, blockNumber>>8, blockNumber%256, keyType, authKeyNumber]), 2, this.protocol
 		));
 	}
 	
 	public readBlock(blockNumber: number, length: number): Promise<Buffer> {
 		if (blockNumber < 0 || blockNumber > 0x3F) throw new Error("Block out of range");
 		if (length !== 0x10 && length !== 0x20 && length !== 0x30) throw new Error("Bad length");
-		return makeReaderCardPromise(this.reader.transmitAsync(
+		return handlePCSCReadOperationReturn(this.reader.transmitAsync(
 			new Buffer([0xFF, 0xB0, 0, blockNumber, length]), length + 2, this.protocol
 		));
 	}
@@ -95,14 +75,14 @@ export class Card {
 			new Buffer([0xFF, 0xD6, 0, blockNumber, newData.length]),
 			new Buffer(newData),
 		]);
-		return makeStandardCardPromise(this.reader.transmitAsync(buff, 2, this.protocol));
+		return handlePCSCOperationReturn(this.reader.transmitAsync(buff, 2, this.protocol));
 	}
 
 	public restoreBlock(src: number, dest: number): Promise<void> {
 		if (src < 0 || src > 0x3F) throw new Error("Source block out of range");
 		if (dest < 0 || dest > 0x3F) throw new Error("Destination block out of range");
 		if (((src / 4) | 0) !== ((dest / 4) | 0)) throw new Error("Blocks are not in the same sector");
-		return makeStandardCardPromise(this.reader.transmitAsync(
+		return handlePCSCOperationReturn(this.reader.transmitAsync(
 			new Buffer([0xFF, 0xD7, 0, src, 2, 3, dest]), 2, this.protocol
 		));
 	}
