@@ -24,6 +24,19 @@ mifare.onCard((card: mifare.Card) => {
 						console.log(block.toString(16), data)
 					})
 					.catch(err => console.error(`Data read error: ${err}`));
+			}*/
+			//promise = promise.then(_ => card.loadAuthKey(1, new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])));
+			let step = 1;
+			for (let block = 0; block < 0x3C; block += step) {
+				promise = promise
+					.then(_ => card.authenticate(block, mifare.KeyType.B, keyLocation))
+					.catch(err => {
+						console.error(`Authentication error: ${err}`);
+						return card.authenticate(block, mifare.KeyType.B, 1);
+					})
+					.then(_ => card.readBlock(block, step << 4))
+					.then(data => console.log(data.toString('hex')))
+					.catch(err => console.error(err.message));
 			}
 			promise = promise
 				.then(_ => {

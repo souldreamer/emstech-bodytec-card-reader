@@ -6,8 +6,10 @@
  *
  * Side-note: avoid the original's callback hell, come to the Promise dark-side :D
  ***********************************************************************************/
+/// <reference path="../typings/globals/es6-shim/index.d.ts"/>
 
 import {Card} from './Card';
+import {Set} from 'es6-shim';
 
 const pcscLite = require("pcsclite");
 
@@ -18,12 +20,15 @@ interface OnCardCallback {
 }
 
 const getPCSC = () => PCSC = PCSC || pcscLite();
+const readers: Set<any> = new Set<any>();
+
 export const onCard = (cb: OnCardCallback, debug: boolean = false) => {
 	const pcsc = getPCSC();
 	const log = (debug) ? console.log : () => {};
 
 	pcsc.on("reader", (reader) => {
 		log(`New Reader(${ reader.name })`);
+		readers.add(reader);
 
 		reader.on("status", (status) => {
 			const changes = reader.state ^ status.state;
@@ -53,13 +58,23 @@ export const onCard = (cb: OnCardCallback, debug: boolean = false) => {
 			}
 		});
 
-		reader.on('end', () => log(`Remove Reader(${ reader.name })`));
+		reader.on('end', () => {
+			log(`Remove Reader(${ reader.name })`);
+			readers.delete(reader);
+		});
 
 		reader.on('error', (err) => log(`Error Reader(${ reader.name }): ${ err.message }`));
 	});
 
 	pcsc.on("error", (err) => log(`PCSC error: ${ err.message }`));
 };
+
+export function dispose() {
+	readers.forEach(reader => {
+		reader.close();
+	});
+	readers.clear();
+}
 
 export * from './common';
 export * from './Card';

@@ -4,6 +4,16 @@ export function byteFromTwoHex(high, low) {
 	return ((high & 0xF) << 4) + (low & 0xF);
 }
 
+export function bufferEndsWith(buffer: Buffer, ending: Buffer): boolean {
+	let bufferLength = buffer.length;
+	let endingLength = ending.length;
+
+	// quit early if ending buffer is larger than the first buffer
+	if (bufferLength < endingLength) return false;
+
+	return (buffer.slice(bufferLength - endingLength).compare(ending) === 0);
+}
+
 export enum KeyType {
 	A = 0x60,
 	B = 0x61
