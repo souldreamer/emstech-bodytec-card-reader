@@ -3,11 +3,15 @@
 
 import * as mifare from './mifare-pcsc-promise';
 import * as Promise from 'bluebird';
+import * as fs from 'fs';
+
+let index = 1;
 
 mifare.onCard((card: mifare.Card) => {
 	card
 		.getUID()
 		.then((uid: Buffer) => {
+			let information: Buffer = new Buffer([]);
 			let promise: Promise<any> = card.loadAuthKey(0, Buffer.concat([uid, new Buffer([0x4D, 0x42])]));
 			for (let block = 0; block < 0x3B; block++) {
 				if ((block + 1) % 4 === 0) continue;
@@ -15,9 +19,20 @@ mifare.onCard((card: mifare.Card) => {
 					.then(_ => card.authenticate(block, mifare.KeyType.B, 0))
 					.catch(err => console.error(`Authentication error: ${err}`))
 					.then(_ => card.readBlock(block, 0x10))
-					.then((data: Buffer) => console.log(block.toString(16), data))
+					.then((data: Buffer) => {
+						information = Buffer.concat([information, data]);
+						console.log(block.toString(16), data)
+					})
 					.catch(err => console.error(`Data read error: ${err}`));
 			}
+			promise = promise
+				.then(_ => {
+					console.log(`Writing file ${index}`);
+					let writeStream = fs.createWriteStream(`card-${index}.mfd`);
+					writeStream.write(information);
+					writeStream.end();
+					index++;
+				});
 		})
 		.catch((err: any) => console.error('Could not get UID. Error: ', err));
 }, true);
